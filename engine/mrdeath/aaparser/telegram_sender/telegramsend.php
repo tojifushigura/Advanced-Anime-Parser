@@ -45,33 +45,44 @@ if (!function_exists('postingCheckXfvalue')) {
 }
 
 if (!function_exists('processImages')) {
-	function processImages($images, $homeUrl) {
-		$processedImages = [];
-		$processedImages["external"] = [];
+        function processImages($images, $homeUrl, $small = false) {
+                $processedImages = [];
+                $processedImages["external"] = [];
 
-		foreach ($images as $key => $image) {
-			if (substr($image, 0, 1) == "/") {
-				$processedImages[$key] = ROOT_DIR . str_replace(["thumbs/", "medium/"], "", $image);
-			} else {
-				if (strpos($image, $homeUrl) === false) {
-					$processedImages["external"][] = $key;
-					$imageExtension = pathinfo($image, PATHINFO_EXTENSION);
-					$file = ENGINE_DIR . "/cache/posting_temp_" . $key . "." . $imageExtension;
-					$ch = curl_init($image);
-					curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-					curl_setopt($ch, CURLOPT_BINARYTRANSFER, true);
-					curl_setopt($ch, CURLOPT_USERAGENT, "Googlebot-Image/1.0");
-					curl_setopt($ch, CURLOPT_REFERER, $homeUrl);
-					$imageData = curl_exec($ch);
-					$fileHandle = fopen($file, "w");
-					fwrite($fileHandle, $imageData);
-					fclose($fileHandle);
-					$processedImages[$key] = $file;
-				} else $processedImages[$key] = ROOT_DIR . str_replace( [$homeUrl, "/thumbs/", "/medium/"], "/", $image );
-			}
-		}
-		return $processedImages;
-	}
+                foreach ($images as $key => $image) {
+                        $local = false;
+                        if (substr($image, 0, 1) == "/") {
+                                $local = true;
+                        } elseif (strpos($image, $homeUrl) === 0) {
+                                $local = true;
+                                $image = substr($image, strlen($homeUrl) - 1);
+                        }
+
+                        if ($local) {
+                                if ($small) {
+                                        $image = preg_replace('#/uploads/posts/(?:thumbs/|medium/)?#', '/uploads/posts/medium/', $image);
+                                        $processedImages[$key] = ROOT_DIR . $image;
+                                } else {
+                                        $processedImages[$key] = ROOT_DIR . str_replace(["thumbs/", "medium/"], "", $image);
+                                }
+                        } else {
+                                $processedImages["external"][] = $key;
+                                $imageExtension = pathinfo($image, PATHINFO_EXTENSION);
+                                $file = ENGINE_DIR . "/cache/posting_temp_" . $key . "." . $imageExtension;
+                                $ch = curl_init($image);
+                                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                                curl_setopt($ch, CURLOPT_BINARYTRANSFER, true);
+                                curl_setopt($ch, CURLOPT_USERAGENT, "Googlebot-Image/1.0");
+                                curl_setopt($ch, CURLOPT_REFERER, $homeUrl);
+                                $imageData = curl_exec($ch);
+                                $fileHandle = fopen($file, "w");
+                                fwrite($fileHandle, $imageData);
+                                fclose($fileHandle);
+                                $processedImages[$key] = $file;
+                        }
+                }
+                return $processedImages;
+        }
 }
 
 if (!function_exists('makeCurlRequest')) {
@@ -115,7 +126,7 @@ if (!isset($tlg_news_id)) {
 }
 
 if ( isset($tlg_news_id) && isset($tlg_template) && isset($aaparser_config['push_notifications'][$tlg_template]) && isset($aaparser_config['push_notifications']['tg_bot_token']) && isset($aaparser_config['push_notifications']['tg_chanel']) ) {
-    $row = $db->super_query( "SELECT id, date, short_story, full_story, xfields, title, category, alt_name, tags FROM " . PREFIX . "_post WHERE id='" .$tlg_news_id ."' AND approve=1");
+    $row = $db->super_query( "SELECT id, date, short_story, full_story, xfields, title, category, alt_name, tags, descr FROM " . PREFIX . "_post WHERE id='" .$tlg_news_id ."' AND approve=1");
     if (isset($row["id"])) {
         if ($config["seo_type"]) {
             if ($config["seo_type"] == 1 || $config["seo_type"] == 2) {
@@ -144,6 +155,7 @@ if ( isset($tlg_news_id) && isset($tlg_template) && isset($aaparser_config['push
         $row['title'] = sanitizeText(stripslashes($row['title']));
         $row['short_story'] = sanitizeText(stripslashes($row['short_story']));
         $row['full_story'] = sanitizeText(stripslashes($row['full_story']));
+        $row['descr'] = isset($row['descr']) ? sanitizeText(stripslashes($row['descr'])) : '';
         if ( !isset($xfields) ) $xfields = xfieldsload();
         $xfieldsdata = xfieldsdataload($row["xfields"]);
 
@@ -176,7 +188,7 @@ if ( isset($tlg_news_id) && isset($tlg_template) && isset($aaparser_config['push
             $posterImg = [];
             if ($posters[1]) $posterImg["poster"] = trim($posters[1]);
 			else $posterImg["poster"] = trim($aaparser_config['main_fields']['poster_empty']);
-            $posterImg = processImages($posterImg, $config["http_home_url"]);
+            $posterImg = processImages($posterImg, $config["http_home_url"], true);
         }
 
         foreach ($xfields as $value) {
@@ -242,8 +254,24 @@ if ( isset($tlg_news_id) && isset($tlg_template) && isset($aaparser_config['push
         if ( preg_match( "#\\{full-story limit=['\"](.+?)['\"]\\}#i", $aaparser_config['push_notifications'][$tlg_template], $matches ) ) {
             $aaparser_config['push_notifications'][$tlg_template] = str_replace( $matches[0], limitTextLength($row['full_story'], $matches[1]), $aaparser_config['push_notifications'][$tlg_template] );
         }
+        if (stripos($aaparser_config['push_notifications'][$tlg_template], "{meta_description}") !== false) {
+            $aaparser_config['push_notifications'][$tlg_template] = str_replace(
+                "{meta_description}",
+                $row['descr'],
+                $aaparser_config['push_notifications'][$tlg_template]
+            );
+        }
+        if ( preg_match( "#\\{meta_description limit=['\"](.+?)['\"]\\}#i", $aaparser_config['push_notifications'][$tlg_template], $matches ) ) {
+            $aaparser_config['push_notifications'][$tlg_template] = str_replace(
+                $matches[0],
+                limitTextLength($row['descr'], $matches[1]),
+                $aaparser_config['push_notifications'][$tlg_template]
+            );
+        }
+        $full_link_placeholder = false;
         if (stripos($aaparser_config['push_notifications'][$tlg_template], "{full_link}") !== false) {
-            $aaparser_config['push_notifications'][$tlg_template] = str_replace( "{full_link}", $full_link, $aaparser_config['push_notifications'][$tlg_template] );
+            $full_link_placeholder = uniqid('FLINK');
+            $aaparser_config['push_notifications'][$tlg_template] = str_replace( "{full_link}", $full_link_placeholder, $aaparser_config['push_notifications'][$tlg_template] );
         }
         if (stripos($aaparser_config['push_notifications'][$tlg_template], "{main_category_link}") !== false) {
             if ( isset($main_category_link) ) $aaparser_config['push_notifications'][$tlg_template] = str_replace( "{main_category_link}", $main_category_link, $aaparser_config['push_notifications'][$tlg_template] );
@@ -278,6 +306,13 @@ if ( isset($tlg_news_id) && isset($tlg_template) && isset($aaparser_config['push
         $aaparser_config['push_notifications'][$tlg_template] = str_replace("[|x]", "\\x", $aaparser_config['push_notifications'][$tlg_template]);
 
         $aaparser_config['push_notifications'][$tlg_template] = sanitizeText($aaparser_config['push_notifications'][$tlg_template]);
+        if ($full_link_placeholder) {
+            $aaparser_config['push_notifications'][$tlg_template] = str_replace(
+                $full_link_placeholder,
+                htmlspecialchars($full_link, ENT_QUOTES, 'UTF-8'),
+                $aaparser_config['push_notifications'][$tlg_template]
+            );
+        }
 
         if ( preg_match( "@\\\\x([0-9a-fA-F]{2})@x", $aaparser_config['push_notifications'][$tlg_template], $matches ) ) {
             $aaparser_config['push_notifications'][$tlg_template] = preg_replace_callback( "@\\\\x([0-9a-fA-F]{2})@x", function ($r) { return chr(hexdec($r[1])); }, $aaparser_config['push_notifications'][$tlg_template] );

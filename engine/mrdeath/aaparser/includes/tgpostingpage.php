@@ -15,7 +15,7 @@ echo <<<HTML
 HTML;
 showRow('Bot token', 'Введите токен вашего бота, полученный после его создания', showInput(['push_notifications[tg_bot_token]', 'text', $aaparser_config['push_notifications']['tg_bot_token']]));
 showRow('Имя канала с символом @', 'Введите имя канала в формате <b>@имяканала</b>, оно же является частью основной ссылки на приглашение - https://t.me/<b>имяканала</b>', showInput(['push_notifications[tg_chanel]', 'text', $aaparser_config['push_notifications']['tg_chanel']]));
-showRow('Прикреплять картинку-постер к посту телеграм?', '', makeCheckBox('push_notifications[tg_enable_poster]', $aaparser_config['push_notifications']['tg_enable_poster']));
+showRow('Прикреплять картинку-постер к посту телеграм?', 'Изображение будет отправлено в уменьшенном размере', makeCheckBox('push_notifications[tg_enable_poster]', $aaparser_config['push_notifications']['tg_enable_poster']));
 showRow('Источник постера', 'Выберите откуда модуль будет брать постер', makeDropDown( ['xfields' => 'доп. поле', 'short_story' => 'краткое описание', 'full_story' => 'полное описание'], "push_notifications[tg_source_poster]", $aaparser_config['push_notifications']['tg_source_poster']));
 showRow('Отправлять посты в телеграм при помощи крон?', 'Данная настройка влияет только на ручное добавление или редактирование новостей через админку. Если выключено, посты в телеграм будут отправлены сразу же в момент добавления или редактирования новости. Если включено, посты будут добавляться в очередь и отправляться при помощи крон задачи', makeCheckBox('push_notifications[tg_cron_enable]', $aaparser_config['push_notifications']['tg_cron_enable']));
 
@@ -55,9 +55,11 @@ echo <<<HTML
 			    {short-story} - Краткая версия новости</br>
 			    {short-story limit="x"} - Выводит только текст краткой новости без HTML форматирования, при этом сам текст публикации сокращается до указанного X количества символов</br>
 			    {full-story} - Полная версия</br>
-			    {full-story limit="x"} - Выводит только текст полной новости без HTML форматирования, при этом сам текст публикации сокращается до указанного X количества символов</br>
-			    {full_link} - Для вывода полного постоянного адреса новости</br>
-			    {category} - Список категорий, к которым относится статья</br>
+                           {full-story limit="x"} - Выводит только текст полной новости без HTML форматирования, при этом сам текст публикации сокращается до указанного X количества символов</br>
+                           {meta_description} - SEO описание новости</br>
+                           {meta_description limit="x"} - SEO описание, сокращённое до X символов</br>
+                           {full_link} - Для вывода полного постоянного адреса новости. Можно использовать внутри html-тега &lt;a&gt;, например &lt;a href="{full_link}"&gt;Смотреть&lt;/a&gt;</br>
+                           {category} - Список категорий, к которым относится статья</br>
 			    [xfvalue_x] - Значение дополнительного поля "x", где "x" название дополнительного поля</br>
 			    [xfgiven_x] [xfvalue_x] [/xfgiven_x] - Выводится дополнительное поле "x", если поле не пустое</br>
 			    [xfnotgiven_X] [/xfnotgiven_X] - Выводят текст указанный в них если дополнительное поле не было задано при публикации новости, где "х" это имя дополнительного поля</br>
